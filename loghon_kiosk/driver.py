@@ -234,18 +234,34 @@ class LoghonDriver:
                 self._settle(page)
         if not self._visible(pw, wait=3):
             return  # already logged in
-        if not (self.s.email and self.s.password):
-            raise StepFailed("the site asks for a login, but no email/password is set "
-                             "in config.ini (or run Setup and log in by hand once)")
-        email = page.locator(
+        if self.s.email and self.s.password:
+            self._fill_login(page, pw)
+            if self._gone(pw, timeout=10):
+                self._settle(page)
+                return
+        # Loghon's login has a Cloudflare "I'm human" check (Turnstile), which
+        # may refuse an automated login. Hand it to the person instead of
+        # failing: show the window and wait until they have logged in.
+        if self.s.browser_mode == "headless":
+            raise StepFailed("Loghon wants a login. Use 'Log in once…' to log in by hand.")
+        self._show_browser_window(page)
+        self.emit(("status", "Please log in in the Loghon window (tick the \"I'm human\" box). "
+                             "START continues by itself afterwards."))
+        if not self._gone(pw, timeout=self.s.login_wait_seconds):
+            raise StepFailed("nobody logged in to Loghon in time")
+        self._settle(page)
+
+    def _fill_login(self, page: Page, pw: Locator) -> None:
+        user = page.locator(
             "input[type=email], input[name*=mail i], input[id*=mail i], "
             "input[name*=user i], input[autocomplete=username]"
         ).first
-        if not self._visible(email):
-            email = page.locator("input:not([type=password]):not([type=hidden])"
-                                 ":not([type=checkbox]):not([type=submit])").first
-        email.fill(self.s.email)
+        if not self._visible(user):
+            user = page.locator("input:not([type=password]):not([type=hidden])"
+                                ":not([type=checkbox]):not([type=submit])").first
+        user.fill(self.s.email)
         pw.first.fill(self.s.password)
+        page.wait_for_timeout(3000)  # give the "I'm human" check a moment to pass
         # Prefer the submit button inside the login form, so a "Log in" link
         # in the page header is not clicked instead.
         form = page.locator("form").filter(has=page.locator("input[type=password]"))
@@ -260,11 +276,14 @@ class LoghonDriver:
             submit.click()
         else:
             pw.first.press("Enter")
+
+    @staticmethod
+    def _gone(loc: Locator, timeout: float) -> bool:
         try:
-            pw.first.wait_for(state="hidden", timeout=self.s.step_timeout_seconds * 1000)
+            loc.first.wait_for(state="hidden", timeout=timeout * 1000)
+            return True
         except PWTimeout:
-            raise StepFailed("login did not finish (wrong password?)")
-        self._settle(page)
+            return False
 
     def _enable_audio(self, page: Page) -> None:
         if not self.s.audio_labels:

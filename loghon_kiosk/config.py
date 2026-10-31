@@ -22,7 +22,7 @@ def _list(value: str) -> list[str]:
 
 @dataclass
 class Settings:
-    start_url: str = "https://www.loghon.com/"
+    start_url: str = "https://app.loghon.com/"
     translation_url: str = ""
     email: str = ""
     password: str = ""
@@ -37,6 +37,7 @@ class Settings:
     chrome_channel: str = ""
     extra_args: list[str] = field(default_factory=list)
     step_timeout_seconds: float = 30
+    login_wait_seconds: float = 300
     qr_refresh_seconds: float = 10
 
     login_buttons: list[str] = field(default_factory=list)
@@ -85,6 +86,7 @@ def load(path: Path | None = None) -> Settings:
         chrome_channel=br.get("chrome_channel", "").strip(),
         extra_args=br.get("extra_args", "").split(),
         step_timeout_seconds=br.getfloat("step_timeout_seconds", 30),
+        login_wait_seconds=br.getfloat("login_wait_seconds", 300),
         qr_refresh_seconds=br.getfloat("qr_refresh_seconds", 10),
         login_buttons=_list(lab.get("login_buttons", "")),
         login_submit_buttons=_list(lab.get("login_submit_buttons", "")),

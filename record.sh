@@ -18,7 +18,7 @@ mkdir -p "$DATA"
   --target python \
   --user-data-dir "$DATA/browser-profile" \
   --output "$RAW" \
-  https://www.loghon.com/
+  https://app.loghon.com/
 
 # Blank any value typed into something that looks like a password field.
 sed -E '/[Pp]ass/ s/\.fill\("([^"\\]|\\.)*"\)/.fill("***")/' "$RAW" > "$OUT"
