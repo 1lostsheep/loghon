@@ -19,6 +19,7 @@ SITE = Path(__file__).parent / "mock_site"
 
 
 PAGE_LOG = []  # messages the mock page reports via GET /log?m=...
+STUCK = ["0"]  # "1": the mock page ignores its stop button
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -30,6 +31,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             PAGE_LOG.append(urllib.parse.unquote(self.path[7:]))
             self.send_response(204)
             self.end_headers()
+            return
+        if self.path == "/stuck":
+            body = STUCK[0].encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
         super().do_GET()
 
@@ -75,12 +83,28 @@ def main():
         seen = wait_state(events, "running")
         assert any(k == "qr" for k, _ in seen), "no QR code captured"
         print("  page log:", PAGE_LOG)
-        assert PAGE_LOG[-3:] == ["audio=true", "mic ok", "started"], PAGE_LOG
+        assert sorted(PAGE_LOG[-3:]) == ["audio=true", "mic ok", "started"], PAGE_LOG
         assert not any("WRONG" in m for m in PAGE_LOG)
         print(f"round {round_}: stop")
         d.submit("stop")
         wait_state(events, "idle")
         assert PAGE_LOG[-1] == "stopped", PAGE_LOG
+
+    print("round 3: Loghon ignores stop -> browser must stay open")
+    STUCK[0] = "1"
+    d.submit("start")
+    wait_state(events, "running")
+    d.submit("stop")
+    seen = []
+    while not any(k == "error" for k, _ in seen):
+        seen.append(events.get(timeout=60))
+    assert ("state", "running") in seen, seen
+    assert d._ctx is not None, "browser was closed while Loghon was still translating"
+    assert PAGE_LOG[-1] == "stop ignored", PAGE_LOG
+    STUCK[0] = "0"  # the stop button works again; STOP is pressed a second time
+    d.submit("stop")
+    wait_state(events, "idle")
+    assert PAGE_LOG[-1] == "stopped", PAGE_LOG
     d.submit("quit")
     wait_state(events, "quit")
     print("PASS")

@@ -115,7 +115,6 @@ class KioskApp:
                 return
         self.status.config(text="Closing…")
         self.driver.submit("quit")
-        self.root.after(15000, self.root.destroy)  # safety net
 
     # ---- events from the browser thread ----------------------------------
     def _poll(self):

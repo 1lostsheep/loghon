@@ -9,8 +9,12 @@ in church from a Linux Mint laptop.
   audio, starts the translation, allows the microphone and shows the
   translation's **QR code** full size. People in the room scan it with their
   phone camera to follow the translation.
-- **STOP** (red): ends the translation on Loghon and closes the hidden browser.
-  The QR code disappears, since it only works while a translation is running.
+- **STOP** (red): presses Loghon's own stop button (and confirms if Loghon
+  asks), waits until Loghon shows it has stopped, and only then closes the
+  hidden browser. The QR code disappears, since it only works while a
+  translation is running. If the app can't confirm the stop, it does **not**
+  close anything: it brings the Loghon window onto the screen so you can
+  press stop there, then press STOP in the app again.
 
 The microphone is the laptop's default input. Choose it in Mint's
 *Sound* settings → *Input* (built-in mic or a plugged-in microphone/mixer feed).
@@ -48,6 +52,25 @@ Open the app → **START** → turn the screen to the audience → **STOP** afte
 
 Keys: `F11` toggles full screen, `Esc` leaves full screen.
 
+## Teaching the app the real Loghon steps (once)
+
+The app was written without access to loghon.com, so the button names in it are
+guesses. To give it the real ones, record one walk-through on the laptop:
+
+1. In the app, do **Log in once…** (so the recording starts logged in), then quit the app.
+2. Run:
+
+   ```bash
+   ~/loghon-kiosk/record.sh
+   ```
+
+3. A browser opens with a small "Playwright Inspector" window beside it. In
+   the browser, do exactly what you'd do on Sunday: switch audio on, start the
+   translation, allow the microphone, press record, open the QR code, then
+   press stop and confirm. Then close the browser.
+4. Open `~/loghon-recording.txt`, check there's no password in it, and send it
+   to whoever maintains this repo. It lists each click with the exact button names.
+
 ## If a step doesn't work
 
 The app finds Loghon's buttons by their visible text ("Start translation",
@@ -77,6 +100,7 @@ Or send the screenshot from the `logs` folder to whoever maintains this repo.
 | `loghon_kiosk/driver.py` | Drives loghon.com with Playwright/Chromium on a worker thread |
 | `loghon_kiosk/config.py` | Reads `~/.config/loghon-kiosk/config.ini` |
 | `config.example.ini` | All settings with explanations (copied on first run) |
+| `record.sh` | Records a walk-through of the real site (Playwright codegen) |
 | `tests/test_driver.py` | End-to-end test against a mock Loghon page in `tests/mock_site/` |
 
 The QR code is a screenshot of the code Loghon draws on its page, scaled up

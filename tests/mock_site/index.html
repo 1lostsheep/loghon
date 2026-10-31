@@ -37,6 +37,7 @@ $('start').onclick = async () => {
     { c.fillStyle = (i * 7 + j * 3) % 5 < 2 ? '#000' : '#fff'; c.fillRect(i * 10, j * 10, 10, 10); }
   log('started');
 };
-$('stop').onclick = () => { if (confirm('End the translation?')) { $('live').hidden = true; $('app').hidden = false; log('stopped'); } };
+$('stop').onclick = async () => {
+  if ((await (await fetch('/stuck')).text()) === '1') return log('stop ignored'); if (confirm('End the translation?')) { $('live').hidden = true; $('app').hidden = false; log('stopped'); } };
 </script>
 </body></html>

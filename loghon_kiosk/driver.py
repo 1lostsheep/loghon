@@ -72,7 +72,8 @@ class LoghonDriver:
                 elif cmd == "setup":
                     self._setup()
                 elif cmd == "quit":
-                    self._safe_stop_on_quit()
+                    if not self._safe_stop_on_quit():
+                        continue  # keep the app open until Loghon is stopped
                     self._close_browser()
                     self.emit(("state", "quit"))
                     return
@@ -371,20 +372,20 @@ class LoghonDriver:
             pass
 
     # ---- stop -------------------------------------------------------------
-    def _stop(self) -> None:
+    def _stop(self) -> bool:
+        """Press Loghon's own stop button. Returns True once the translation
+        has ended. The browser is only closed after that: closing it alone
+        may leave the translation running on Loghon's side."""
         page = self._page
         if page is None or page.is_closed():
             self._running = False
             self.emit(("state", "idle"))
             self.emit(("status", "Nothing is running."))
-            return
+            return True
         self.emit(("state", "stopping"))
         self.emit(("status", "Stopping translation…"))
         btn = self._find_clickable(page, self.s.stop_buttons, timeout=self.s.step_timeout_seconds)
-        if not btn:
-            self._dump_debug("no-stop-button")
-            self.emit(("status", "Stop button not found on the page; closing the browser to end it."))
-        else:
+        if btn:
             btn.click()
             self._settle(page)
             for text in self.s.confirm_stop_buttons:
@@ -393,18 +394,46 @@ class LoghonDriver:
                     loc.click()
                     self._settle(page)
                     break
-            page.wait_for_timeout(1500)
+        if not btn or not self._stop_button_gone(page):
+            self._dump_debug("stop-not-confirmed")
+            self._show_browser_window(page)
+            self.emit(("state", "running"))
+            self.emit(("error", "Could not confirm the translation stopped. The Loghon window "
+                                "is now on screen: press its stop button, then press STOP here again."))
+            return False
         self._close_browser()  # also releases the microphone
         self._running = False
         self.emit(("state", "idle"))
         self.emit(("status", "Translation stopped. Press START for the next one."))
+        return True
 
-    def _safe_stop_on_quit(self) -> None:
-        if self._running:
-            try:
-                self._stop()
-            except Exception:
-                pass
+    def _stop_button_gone(self, page: Page, timeout: float = 10) -> bool:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if self._find_clickable(page, self.s.stop_buttons, timeout=0) is None:
+                return True
+            page.wait_for_timeout(500)
+        return False
+
+    def _show_browser_window(self, page: Page) -> None:
+        """Move the off-screen/minimized Loghon window onto the screen."""
+        try:
+            cdp = self._ctx.new_cdp_session(page)
+            win = cdp.send("Browser.getWindowForTarget")["windowId"]
+            cdp.send("Browser.setWindowBounds", {"windowId": win, "bounds": {"windowState": "normal"}})
+            cdp.send("Browser.setWindowBounds", {"windowId": win, "bounds": {
+                "left": 40, "top": 40, "width": 1280, "height": 900}})
+            page.bring_to_front()
+        except Exception:
+            pass  # headless mode has no window to show
+
+    def _safe_stop_on_quit(self) -> bool:
+        if not self._running:
+            return True
+        try:
+            return self._stop()
+        except Exception:
+            return False
 
     # ---- helpers ------------------------------------------------------------
     def _settle(self, page: Page) -> None:
