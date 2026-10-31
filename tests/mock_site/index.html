@@ -1,0 +1,42 @@
+<!doctype html>
+<html><head><title>Mock Loghon</title></head>
+<body>
+<!-- Stand-in for the real site, used by tests/test_driver.py. -->
+<nav><a href="#" id="marketing">Get started</a> <a href="#" id="loginlink">Log in</a></nav>
+<form id="login" hidden>
+  <input type="email" name="email" placeholder="Email">
+  <input type="password" name="password">
+  <button type="submit">Sign in</button>
+</form>
+<section id="app" hidden>
+  <label><input type="checkbox" id="audio"> Audio</label>
+  <button id="start">Start translation</button>
+</section>
+<section id="live" hidden>
+  <div class="qr-box"><canvas id="qr" width="200" height="200"></canvas></div>
+  <button id="stop">Stop</button>
+</section>
+<pre id="log"></pre>
+<script>
+const $ = id => document.getElementById(id);
+const log = m => { $('log').textContent += m + "\n"; fetch('/log?m=' + encodeURIComponent(m)); };
+if (localStorage.loggedIn) $('app').hidden = false;
+$('loginlink').onclick = e => { e.preventDefault(); $('login').hidden = false; };
+$('marketing').onclick = () => log('WRONG: marketing clicked');
+$('login').onsubmit = e => {
+  e.preventDefault();
+  if (e.target.password.value !== 'secret') return log('bad password');
+  localStorage.loggedIn = '1'; $('login').hidden = true; $('app').hidden = false; log('logged in');
+};
+$('start').onclick = async () => {
+  log('audio=' + $('audio').checked);
+  await navigator.mediaDevices.getUserMedia({audio: true}).then(() => log('mic ok'), e => log('mic err ' + e.name));
+  $('app').hidden = true; $('live').hidden = false;
+  const c = $('qr').getContext('2d');
+  for (let i = 0; i < 20; i++) for (let j = 0; j < 20; j++)
+    { c.fillStyle = (i * 7 + j * 3) % 5 < 2 ? '#000' : '#fff'; c.fillRect(i * 10, j * 10, 10, 10); }
+  log('started');
+};
+$('stop').onclick = () => { if (confirm('End the translation?')) { $('live').hidden = true; $('app').hidden = false; log('stopped'); } };
+</script>
+</body></html>
