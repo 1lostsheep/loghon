@@ -34,6 +34,7 @@ def _list(value: str) -> list[str]:
 class Settings:
     start_url: str = "https://app.loghon.com/"
     translation_url: str = ""
+    viewer_url: str = ""
     email: str = ""
     password: str = ""
 
@@ -59,6 +60,8 @@ class Settings:
     qr_selectors: list[str] = field(default_factory=list)
     stop_buttons: list[str] = field(default_factory=list)
     confirm_stop_buttons: list[str] = field(default_factory=list)
+    running_texts: list[str] = field(default_factory=list)
+    stop_selectors: list[str] = field(default_factory=list)
 
     profile_dir: Path = DATA_DIR / "browser-profile"
     log_dir: Path = DATA_DIR / "logs"
@@ -94,6 +97,7 @@ def load(path: Path | None = None) -> Settings:
     s = Settings(
         start_url=acc.get("start_url", Settings.start_url).strip(),
         translation_url=acc.get("translation_url", "").strip(),
+        viewer_url=acc.get("viewer_url", "").strip(),
         email=(os.environ.get("LOGHON_USERNAME") or os.environ.get("LOGHON_EMAIL")
                or acc.get("username", "") or acc.get("email", "")).strip(),
         password=os.environ.get("LOGHON_PASSWORD", acc.get("password", "")),
@@ -117,6 +121,8 @@ def load(path: Path | None = None) -> Settings:
         qr_selectors=labels("qr_selectors"),
         stop_buttons=labels("stop_buttons"),
         confirm_stop_buttons=labels("confirm_stop_buttons"),
+        running_texts=labels("running_texts"),
+        stop_selectors=labels("stop_selectors"),
     )
     for d in (s.profile_dir, s.log_dir):
         d.mkdir(parents=True, exist_ok=True)

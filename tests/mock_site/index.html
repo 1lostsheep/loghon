@@ -18,8 +18,10 @@
   <button id="cancel">Cancel</button> <button id="rec">Start Recording</button>
 </div>
 <section id="live" hidden>
+  <div class="banner">Recording Active</div>
   <div class="qr-box"><canvas id="qr" width="200" height="200"></canvas></div>
-  <button id="stop">Stop</button>
+  <button id="endTranslation" title="End translation">&#9632;</button>
+  <dialog id="viewer"><h3>Viewer Access Settings</h3><button>Apply</button> <button>Cancel</button></dialog>
 </section>
 <pre id="log"></pre>
 <script>
@@ -47,8 +49,10 @@ $('rec').onclick = async () => {
   for (let i = 0; i < 20; i++) for (let j = 0; j < 20; j++)
     { c.fillStyle = (i * 7 + j * 3) % 5 < 2 ? '#000' : '#fff'; c.fillRect(i * 10, j * 10, 10, 10); }
   log('started');
+  // Like a person who opened the QR box and left it open, covering the page.
+  setTimeout(() => $('viewer').showModal(), 500);
 };
-$('stop').onclick = async () => {
+$('endTranslation').onclick = async () => {
   if ((await (await fetch('/stuck')).text()) === '1') return log('stop ignored'); if (confirm('End the translation?')) { $('live').hidden = true; $('app').hidden = false; log('stopped'); } };
 </script>
 </body></html>

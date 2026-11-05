@@ -106,8 +106,13 @@ Or send the screenshot from the `logs` folder to whoever maintains this repo.
 | `record.sh` | Records a walk-through of the real site (Playwright codegen) |
 | `tests/test_driver.py` | End-to-end test against a mock Loghon page in `tests/mock_site/` |
 
-The QR code is a screenshot of the code Loghon draws on its page, scaled up
-with sharp edges, and refreshed every 10 seconds while running. The microphone
+The QR code is the account's fixed public viewer link (`viewer_url` in
+`config.ini`, Loghon's "Public username link"). The app draws it itself and
+shows it all the time, with the link in plain text under it; it opens the
+live session while one runs. START logs in, starts a session, clicks
+"Start Recording" in Loghon's Session Setup box and checks that Loghon shows
+"Recording Active". STOPP closes any open Loghon box, presses Loghon's stop
+button (`#endTranslation`) and waits until it is gone. The microphone
 prompt is accepted automatically (`--use-fake-ui-for-media-stream` only
 auto-accepts the prompt; it still uses the real microphone).
 

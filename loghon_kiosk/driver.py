@@ -83,11 +83,15 @@ class LoghonDriver:
                     return
             except Exception as e:  # report everything to the UI
                 self._dump_debug(f"{cmd}-failed")
-                self.emit(("error", f"{CMD_DE.get(cmd, cmd)} fehlgeschlagen: {e}"))
+                # Keep it to one short line; the details go to the terminal.
+                short = str(e).strip().splitlines()[0][:160] if str(e).strip() else type(e).__name__
+                self.emit(("error", f"{CMD_DE.get(cmd, cmd)} fehlgeschlagen: {short}"))
                 traceback.print_exc()
                 if cmd == "start":
                     self._running = False
                     self.emit(("state", "idle"))
+                elif cmd == "stop" and self._running:
+                    self.emit(("state", "running"))  # STOPP can be pressed again
 
     # ---- browser lifecycle -------------------------------------------
     def _open_browser(self, visible: bool) -> Page:
@@ -233,14 +237,24 @@ class LoghonDriver:
             else:
                 self._dump_debug("no-start-recording")
 
-        self.emit(("status", "Warte auf den QR-Code…"))
-        png = self._grab_qr(page, timeout=self.s.step_timeout_seconds)
-        if png is None:
-            self._dump_debug("no-qr")
-            self.emit(("status", "Übersetzung gestartet, aber der QR-Code wurde auf der Seite nicht gefunden."))
+        if self.s.viewer_url:
+            # The QR code is the account's fixed viewer link, drawn by the app
+            # itself; just check that Loghon shows the recording as active.
+            if self._wait_text(page, self.s.running_texts, self.s.step_timeout_seconds):
+                self.emit(("status", "Die Übersetzung läuft."))
+            else:
+                self._dump_debug("not-recording")
+                self.emit(("error", "Gestartet, aber Loghon zeigt keine laufende Aufnahme. "
+                                    "Bitte im Loghon-Fenster nachsehen."))
         else:
-            self._publish_qr(png)
-            self.emit(("status", "Die Übersetzung läuft. QR-Code scannen."))
+            self.emit(("status", "Warte auf den QR-Code…"))
+            png = self._grab_qr(page, timeout=self.s.step_timeout_seconds)
+            if png is None:
+                self._dump_debug("no-qr")
+                self.emit(("status", "Übersetzung gestartet, aber der QR-Code wurde auf der Seite nicht gefunden."))
+            else:
+                self._publish_qr(png)
+                self.emit(("status", "Die Übersetzung läuft. QR-Code scannen."))
         self._running = True
         self.emit(("state", "running"))
 
@@ -301,6 +315,17 @@ class LoghonDriver:
             submit.click()
         else:
             pw.first.press("Enter")
+
+    @staticmethod
+    def _wait_text(page: Page, texts: list[str], timeout: float) -> bool:
+        if not texts:
+            return True
+        rx = re.compile("|".join(re.escape(t) for t in texts), re.I)
+        try:
+            page.get_by_text(rx).first.wait_for(state="visible", timeout=timeout * 1000)
+            return True
+        except Exception:
+            return False
 
     @staticmethod
     def _gone(loc: Locator, timeout: float) -> bool:
@@ -415,6 +440,8 @@ class LoghonDriver:
             self.emit(("error", "Das Loghon-Browserfenster wurde geschlossen."))
             self.emit(("state", "idle"))
             return
+        if self.s.viewer_url:
+            return  # fixed QR code, nothing to refresh
         try:
             loc = self._find_qr(page)
             if loc is not None:
@@ -435,9 +462,12 @@ class LoghonDriver:
             return True
         self.emit(("state", "stopping"))
         self.emit(("status", "Übersetzung wird gestoppt…"))
-        btn = self._find_clickable(page, self.s.stop_buttons, timeout=self.s.step_timeout_seconds)
+        # Boxes left open on the Loghon page (e.g. the QR/viewer settings)
+        # lie on top of the stop button and swallow the click.
+        self._close_overlays(page)
+        btn = self._find_stop_button(page, timeout=self.s.step_timeout_seconds)
         if btn:
-            btn.click()
+            self._click(page, btn)
             self._settle(page)
             for text in self.s.confirm_stop_buttons:
                 loc = self._find_clickable(page, [text], timeout=2)
@@ -461,7 +491,7 @@ class LoghonDriver:
     def _stop_button_gone(self, page: Page, timeout: float = 10) -> bool:
         deadline = time.time() + timeout
         while time.time() < deadline:
-            if self._find_clickable(page, self.s.stop_buttons, timeout=0) is None:
+            if self._find_stop_button(page, timeout=0) is None:
                 return True
             page.wait_for_timeout(500)
         return False
@@ -477,6 +507,43 @@ class LoghonDriver:
             page.bring_to_front()
         except Exception:
             pass  # headless mode has no window to show
+
+    def _find_stop_button(self, page: Page, timeout: float) -> Locator | None:
+        deadline = time.time() + timeout
+        while True:
+            for sel in self.s.stop_selectors:  # Loghon's own button id first
+                loc = page.locator(sel)
+                try:
+                    if loc.count() and loc.first.is_visible() and loc.first.is_enabled():
+                        return loc.first
+                except Exception:
+                    pass
+            btn = self._find_clickable(page, self.s.stop_buttons, timeout=0)
+            if btn or time.time() >= deadline:
+                return btn
+            page.wait_for_timeout(400)
+
+    @staticmethod
+    def _close_overlays(page: Page) -> None:
+        try:
+            page.keyboard.press("Escape")
+            page.evaluate("document.querySelectorAll('dialog[open]').forEach(d => d.close())")
+            page.wait_for_timeout(300)
+        except Exception:
+            pass
+
+    def _click(self, page: Page, loc: Locator) -> None:
+        """Click; if something still covers the button, close it and retry."""
+        try:
+            loc.click(timeout=5000)
+            return
+        except Exception:
+            pass
+        self._close_overlays(page)
+        try:
+            loc.click(timeout=5000)
+        except Exception:
+            loc.dispatch_event("click")  # same as the page's own click handler
 
     def _safe_stop_on_quit(self) -> bool:
         if not self._running:

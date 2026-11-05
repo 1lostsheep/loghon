@@ -81,7 +81,10 @@ def main():
         print(f"round {round_}: start")
         d.submit("start")
         seen = wait_state(events, "running")
-        assert any(k == "qr" for k, _ in seen), "no QR code captured"
+        if s.viewer_url:  # fixed QR: the page must show the recording as active
+            assert ("status", "Die Übersetzung läuft.") in seen, seen
+        else:
+            assert any(k == "qr" for k, _ in seen), "no QR code captured"
         print("  page log:", PAGE_LOG)
         assert sorted(PAGE_LOG[-3:]) == ["audio=true", "mic ok", "started"], PAGE_LOG
         assert not any("WRONG" in m for m in PAGE_LOG)

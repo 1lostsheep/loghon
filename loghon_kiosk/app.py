@@ -8,6 +8,7 @@ import sys
 import tkinter as tk
 from tkinter import messagebox
 
+import qrcode
 from PIL import Image, ImageTk
 
 from . import config
@@ -53,6 +54,11 @@ class KioskApp:
         self.sub_lbl.pack(side="top", pady=(0, 10))
         self.qr_lbl = tk.Label(left, bg=BG, fg="#888", font=("DejaVu Sans", 30),
                                text="START drücken, um die\nÜbersetzung zu beginnen")
+        if settings.viewer_url:
+            # The link in plain text, for phones that cannot scan.
+            self.url_lbl = tk.Label(left, text=settings.viewer_url.split("://", 1)[-1],
+                                    bg=BG, fg=FG, font=("DejaVu Sans", 24))
+            self.url_lbl.pack(side="bottom", pady=(5, 0))
         self.qr_lbl.pack(side="top", fill="both", expand=True)
         self.qr_lbl.bind("<Configure>", lambda e: self._render_qr())
 
@@ -77,14 +83,16 @@ class KioskApp:
         bottom = tk.Frame(root, bg=BG)
         bottom.grid(row=1, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 10))
         self.status = tk.Label(bottom, text="Bereit.", bg=BG, fg="#444", anchor="w",
-                               font=("DejaVu Sans", 14))
+                               justify="left", wraplength=900, font=("DejaVu Sans", 14))
         self.status.pack(side="left", fill="x", expand=True)
         small = dict(font=("DejaVu Sans", 11), relief="flat", bg="#eee", fg="#333", bd=0, padx=10, pady=4)
         tk.Button(bottom, text="Beenden", command=self.quit, **small).pack(side="right", padx=4)
         self.setup_btn = tk.Button(bottom, text="Einmalig anmelden…", command=self.on_setup, **small)
         self.setup_btn.pack(side="right", padx=4)
 
-        if settings.show_cached_qr and settings.qr_cache.exists():
+        if settings.viewer_url:
+            self.qr_png = make_qr(settings.viewer_url)  # fixed: shown all the time
+        elif settings.show_cached_qr and settings.qr_cache.exists():
             self.qr_png = settings.qr_cache.read_bytes()
             self.sub_lbl.config(text=settings.subtitle + "  (läuft noch nicht)")
 
@@ -122,9 +130,9 @@ class KioskApp:
             while True:
                 kind, value = self.events.get_nowait()
                 if kind == "status":
-                    self.status.config(text=value, fg="#444")
+                    self.status.config(text=value[:200], fg="#444")
                 elif kind == "error":
-                    self.status.config(text=value, fg=RED)
+                    self.status.config(text=value[:200], fg=RED)
                 elif kind == "qr":
                     self.qr_png = value
                     self.sub_lbl.config(text=self.s.subtitle)
@@ -149,7 +157,7 @@ class KioskApp:
                              bg=RED if stop_on else RED_DIM,
                              text="STOPPT…" if state == "stopping" else "STOPP")
         self.setup_btn.config(state="normal" if start_on else "disabled")
-        if state == "idle" and not (self.s.show_cached_qr and self.qr_png):
+        if state == "idle" and not self.s.viewer_url and not (self.s.show_cached_qr and self.qr_png):
             self.qr_png = None
             self._render_qr()
 
@@ -167,6 +175,15 @@ class KioskApp:
         photo = ImageTk.PhotoImage(img)
         self.qr_lbl.config(image=photo, text="")
         self.qr_lbl.image = photo
+
+
+def make_qr(url: str) -> bytes:
+    q = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=4)
+    q.add_data(url)
+    q.make(fit=True)
+    buf = io.BytesIO()
+    q.make_image(fill_color="black", back_color="white").save(buf)
+    return buf.getvalue()
 
 
 def main(argv: list[str] | None = None) -> int:
