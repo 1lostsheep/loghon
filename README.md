@@ -9,12 +9,12 @@ in church from a Linux Mint laptop.
   audio, starts the translation, allows the microphone and shows the
   translation's **QR code** full size. People in the room scan it with their
   phone camera to follow the translation.
-- **STOPP** (red): presses Loghon's own stop button (and confirms if Loghon
+- **STOP** (red): presses Loghon's own stop button (and confirms if Loghon
   asks), waits until Loghon shows it has stopped, and only then closes the
   hidden browser. The QR code disappears, since it only works while a
   translation is running. If the app can't confirm the stop, it does **not**
   close anything: it brings the Loghon window onto the screen so you can
-  press stop there, then press STOPP in the app again.
+  press stop there, then press STOP in the app again.
 
 The microphone is the laptop's default input. Choose it in Mint's
 *Sound* settings → *Input* (built-in mic or a plugged-in microphone/mixer feed).
@@ -51,7 +51,7 @@ All text on the kiosk screen is German; change the title and subtitle in
 
 ## Every Sunday
 
-Open the app → **START** → turn the screen to the audience → **STOPP** after the talk.
+Open the app → **START** → turn the screen to the audience → **STOP** after the talk.
 
 Keys: `F11` toggles full screen, `Esc` leaves full screen.
 
@@ -99,7 +99,7 @@ Or send the screenshot from the `logs` folder to whoever maintains this repo.
 
 | File | Purpose |
 |---|---|
-| `loghon_kiosk/app.py` | Full-screen Tk window (QR code, START, STOPP, status line) |
+| `loghon_kiosk/app.py` | Full-screen Tk window (QR code, START, STOP, status line) |
 | `loghon_kiosk/driver.py` | Drives loghon.com with Playwright/Chromium on a worker thread |
 | `loghon_kiosk/config.py` | Reads `~/.config/loghon-kiosk/config.ini` |
 | `config.example.ini` | All settings with explanations (copied on first run) |
@@ -111,7 +111,7 @@ The QR code is the account's fixed public viewer link (`viewer_url` in
 shows it all the time, with the link in plain text under it; it opens the
 live session while one runs. START logs in, starts a session, clicks
 "Start Recording" in Loghon's Session Setup box and checks that Loghon shows
-"Recording Active". STOPP closes any open Loghon box, presses Loghon's stop
+"Recording Active". STOP closes any open Loghon box, presses Loghon's stop
 button (`#endTranslation`) and waits until it is gone. The microphone
 prompt is accepted automatically (`--use-fake-ui-for-media-stream` only
 auto-accepts the prompt; it still uses the real microphone).

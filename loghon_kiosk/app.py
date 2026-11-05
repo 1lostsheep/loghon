@@ -77,7 +77,7 @@ class KioskApp:
                                    disabledforeground="white", relief="flat", bd=0,
                                    command=self.on_start, cursor="hand2")
         self.start_btn.grid(row=3, column=0, sticky="nsew", pady=(0, 10))
-        self.stop_btn = tk.Button(right, text="STOPP", font=btn_font, bg=RED, fg="white",
+        self.stop_btn = tk.Button(right, text="STOP", font=btn_font, bg=RED, fg="white",
                                   activebackground="#b51f1f", activeforeground="white",
                                   disabledforeground="white", relief="flat", bd=0,
                                   command=self.on_stop, cursor="hand2")
@@ -159,7 +159,7 @@ class KioskApp:
                               text={"starting": "STARTET…", "running": "LÄUFT"}.get(state, "START"))
         self.stop_btn.config(state="normal" if stop_on else "disabled",
                              bg=RED if stop_on else RED_DIM,
-                             text="STOPPT…" if state == "stopping" else "STOPP")
+                             text="STOPPT…" if state == "stopping" else "STOP")
         self.setup_btn.config(state="normal" if start_on else "disabled")
         if state == "idle" and not self.s.viewer_url and not (self.s.show_cached_qr and self.qr_png):
             self.qr_png = None

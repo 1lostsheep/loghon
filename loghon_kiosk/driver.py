@@ -480,7 +480,7 @@ class LoghonDriver:
             self._show_browser_window(page)
             self.emit(("state", "running"))
             self.emit(("error", "Konnte nicht bestätigen, dass die Übersetzung gestoppt ist. Das Loghon-Fenster "
-                                "ist jetzt sichtbar: dort Stopp drücken, dann hier noch einmal STOPP."))
+                                "ist jetzt sichtbar: dort Stopp drücken, dann hier noch einmal STOP."))
             return False
         self._close_browser()  # also releases the microphone
         self._running = False
