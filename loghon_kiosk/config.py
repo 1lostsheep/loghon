@@ -14,6 +14,16 @@ CONFIG_FILE = CONFIG_DIR / "config.ini"
 EXAMPLE_FILE = Path(__file__).resolve().parent.parent / "config.example.ini"
 
 
+# English texts that older versions wrote into the user's config.ini.
+_OLD_ENGLISH = {"Scan for live translation", "Point your phone camera at the code"}
+
+
+def _german(value: str, default: str) -> str:
+    """The screen is German: empty or old English texts give the default."""
+    value = value.strip()
+    return default if not value or value in _OLD_ENGLISH else value
+
+
 def _list(value: str) -> list[str]:
     """Comma- or newline-separated list; blanks dropped."""
     parts = [p.strip() for chunk in value.splitlines() for p in chunk.split(",")]
@@ -77,8 +87,8 @@ def load(path: Path | None = None) -> Settings:
         email=(os.environ.get("LOGHON_USERNAME") or os.environ.get("LOGHON_EMAIL")
                or acc.get("username", "") or acc.get("email", "")).strip(),
         password=os.environ.get("LOGHON_PASSWORD", acc.get("password", "")),
-        title=scr.get("title", Settings.title),
-        subtitle=scr.get("subtitle", Settings.subtitle),
+        title=_german(scr.get("title", ""), Settings.title),
+        subtitle=_german(scr.get("subtitle", ""), Settings.subtitle),
         fullscreen=scr.getboolean("fullscreen", True),
         show_cached_qr=scr.getboolean("show_last_qr_at_startup", True),
         browser_mode=br.get("mode", "offscreen").strip().lower(),
