@@ -29,7 +29,7 @@ class KioskApp:
         self.qr_png: bytes | None = None
         self.state = "idle"
 
-        root.title("Loghon Translation")
+        root.title("Loghon Übersetzung")
         root.configure(bg=BG)
         root.geometry("1280x800")
         if settings.fullscreen:
@@ -52,7 +52,7 @@ class KioskApp:
                                 font=("DejaVu Sans", 22))
         self.sub_lbl.pack(side="top", pady=(0, 10))
         self.qr_lbl = tk.Label(left, bg=BG, fg="#888", font=("DejaVu Sans", 30),
-                               text="Press START to begin\nthe translation")
+                               text="START drücken, um die\nÜbersetzung zu beginnen")
         self.qr_lbl.pack(side="top", fill="both", expand=True)
         self.qr_lbl.bind("<Configure>", lambda e: self._render_qr())
 
@@ -68,7 +68,7 @@ class KioskApp:
                                    disabledforeground="white", relief="flat", bd=0,
                                    command=self.on_start, cursor="hand2")
         self.start_btn.grid(row=0, column=0, sticky="nsew", pady=(0, 15))
-        self.stop_btn = tk.Button(right, text="STOP", font=btn_font, bg=RED, fg="white",
+        self.stop_btn = tk.Button(right, text="STOPP", font=btn_font, bg=RED, fg="white",
                                   activebackground="#b51f1f", activeforeground="white",
                                   disabledforeground="white", relief="flat", bd=0,
                                   command=self.on_stop, cursor="hand2")
@@ -76,17 +76,17 @@ class KioskApp:
 
         bottom = tk.Frame(root, bg=BG)
         bottom.grid(row=1, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 10))
-        self.status = tk.Label(bottom, text="Ready.", bg=BG, fg="#444", anchor="w",
+        self.status = tk.Label(bottom, text="Bereit.", bg=BG, fg="#444", anchor="w",
                                font=("DejaVu Sans", 14))
         self.status.pack(side="left", fill="x", expand=True)
         small = dict(font=("DejaVu Sans", 11), relief="flat", bg="#eee", fg="#333", bd=0, padx=10, pady=4)
-        tk.Button(bottom, text="Quit", command=self.quit, **small).pack(side="right", padx=4)
-        self.setup_btn = tk.Button(bottom, text="Log in once…", command=self.on_setup, **small)
+        tk.Button(bottom, text="Beenden", command=self.quit, **small).pack(side="right", padx=4)
+        self.setup_btn = tk.Button(bottom, text="Einmalig anmelden…", command=self.on_setup, **small)
         self.setup_btn.pack(side="right", padx=4)
 
         if settings.show_cached_qr and settings.qr_cache.exists():
             self.qr_png = settings.qr_cache.read_bytes()
-            self.sub_lbl.config(text=settings.subtitle + "  (not running yet)")
+            self.sub_lbl.config(text=settings.subtitle + "  (läuft noch nicht)")
 
         self.driver = LoghonDriver(settings, self.events.put)
         self._apply_state("idle")
@@ -111,9 +111,9 @@ class KioskApp:
 
     def quit(self):
         if self.state in ("running", "starting"):
-            if not messagebox.askyesno("Quit", "A translation is running. Stop it and quit?"):
+            if not messagebox.askyesno("Beenden", "Eine Übersetzung läuft. Stoppen und beenden?"):
                 return
-        self.status.config(text="Closing…")
+        self.status.config(text="Wird geschlossen…")
         self.driver.submit("quit")
 
     # ---- events from the browser thread ----------------------------------
@@ -144,10 +144,10 @@ class KioskApp:
         stop_on = state in ("running", "starting")
         self.start_btn.config(state="normal" if start_on else "disabled",
                               bg=GREEN if start_on else GREEN_DIM,
-                              text={"starting": "STARTING…", "running": "RUNNING"}.get(state, "START"))
+                              text={"starting": "STARTET…", "running": "LÄUFT"}.get(state, "START"))
         self.stop_btn.config(state="normal" if stop_on else "disabled",
                              bg=RED if stop_on else RED_DIM,
-                             text="STOPPING…" if state == "stopping" else "STOP")
+                             text="STOPPT…" if state == "stopping" else "STOPP")
         self.setup_btn.config(state="normal" if start_on else "disabled")
         if state == "idle" and not (self.s.show_cached_qr and self.qr_png):
             self.qr_png = None
@@ -155,7 +155,7 @@ class KioskApp:
 
     def _render_qr(self):
         if not self.qr_png:
-            self.qr_lbl.config(image="", text="Press START to begin\nthe translation")
+            self.qr_lbl.config(image="", text="START drücken, um die\nÜbersetzung zu beginnen")
             self.qr_lbl.image = None
             return
         w, h = self.qr_lbl.winfo_width(), self.qr_lbl.winfo_height()

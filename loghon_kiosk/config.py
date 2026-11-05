@@ -27,8 +27,8 @@ class Settings:
     email: str = ""
     password: str = ""
 
-    title: str = "Scan for live translation"
-    subtitle: str = "Point your phone camera at the code"
+    title: str = "Live-Übersetzung"
+    subtitle: str = "QR-Code mit der Handykamera scannen"
     fullscreen: bool = True
     show_cached_qr: bool = True
 
@@ -37,7 +37,6 @@ class Settings:
     chrome_channel: str = ""
     extra_args: list[str] = field(default_factory=list)
     step_timeout_seconds: float = 30
-    login_wait_seconds: float = 300
     qr_refresh_seconds: float = 10
 
     login_buttons: list[str] = field(default_factory=list)
@@ -75,7 +74,8 @@ def load(path: Path | None = None) -> Settings:
     s = Settings(
         start_url=acc.get("start_url", Settings.start_url).strip(),
         translation_url=acc.get("translation_url", "").strip(),
-        email=os.environ.get("LOGHON_EMAIL", acc.get("email", "")).strip(),
+        email=(os.environ.get("LOGHON_USERNAME") or os.environ.get("LOGHON_EMAIL")
+               or acc.get("username", "") or acc.get("email", "")).strip(),
         password=os.environ.get("LOGHON_PASSWORD", acc.get("password", "")),
         title=scr.get("title", Settings.title),
         subtitle=scr.get("subtitle", Settings.subtitle),
@@ -86,7 +86,6 @@ def load(path: Path | None = None) -> Settings:
         chrome_channel=br.get("chrome_channel", "").strip(),
         extra_args=br.get("extra_args", "").split(),
         step_timeout_seconds=br.getfloat("step_timeout_seconds", 30),
-        login_wait_seconds=br.getfloat("login_wait_seconds", 300),
         qr_refresh_seconds=br.getfloat("qr_refresh_seconds", 10),
         login_buttons=_list(lab.get("login_buttons", "")),
         login_submit_buttons=_list(lab.get("login_submit_buttons", "")),

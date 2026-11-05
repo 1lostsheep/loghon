@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=Loghon Translation
-Comment=Start and stop Loghon live translation and show the QR code
+Name=Loghon Übersetzung
+Comment=Loghon-Live-Übersetzung starten und stoppen, QR-Code anzeigen
 Exec=@HERE@/run.sh
 Path=@HERE@
 Icon=audio-input-microphone

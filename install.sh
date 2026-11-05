@@ -29,5 +29,5 @@ if [ -d "$DESK" ]; then
 fi
 
 echo
-echo "Done. Start it from the menu (\"Loghon Translation\") or the desktop icon."
-echo "First time: click \"Log in once…\" at the bottom of the window and log in."
+echo "Done. Start it from the menu (\"Loghon Übersetzung\") or the desktop icon."
+echo "First time: click \"Einmalig anmelden…\" at the bottom of the window and log in."

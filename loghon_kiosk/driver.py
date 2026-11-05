@@ -13,6 +13,7 @@ be adjusted.
 from __future__ import annotations
 
 import queue
+import subprocess
 import re
 import threading
 import time
@@ -31,6 +32,9 @@ from playwright.sync_api import (
 from .config import Settings
 
 Event = tuple  # ("status", text) | ("state", name) | ("qr", png_bytes) | ("error", text)
+
+
+CMD_DE = {"start": "Start", "stop": "Stopp", "setup": "Anmeldung", "quit": "Beenden"}
 
 
 class StepFailed(Exception):
@@ -79,7 +83,7 @@ class LoghonDriver:
                     return
             except Exception as e:  # report everything to the UI
                 self._dump_debug(f"{cmd}-failed")
-                self.emit(("error", f"{cmd} failed: {e}"))
+                self.emit(("error", f"{CMD_DE.get(cmd, cmd)} fehlgeschlagen: {e}"))
                 traceback.print_exc()
                 if cmd == "start":
                     self._running = False
@@ -134,6 +138,11 @@ class LoghonDriver:
         self._page = page
         return page
 
+    @staticmethod
+    def _playwright_chromium_path() -> str:
+        with sync_playwright() as pw:
+            return pw.chromium.executable_path
+
     def _close_browser(self) -> None:
         try:
             if self._ctx:
@@ -149,37 +158,46 @@ class LoghonDriver:
 
     # ---- setup: let a person log in by hand once ---------------------
     def _setup(self) -> None:
+        """Open a plain browser window (not remote-controlled) on the app's
+        own profile, so a person can log in and pass Loghon's Cloudflare
+        "I'm human" check. A browser under Playwright control fails that
+        check every time. The saved login is reused by START afterwards."""
         self._close_browser()
-        page = self._open_browser(visible=True)
-        page.goto(self.s.start_url)
-        self.emit(("status", "Browser open. Log in to Loghon, then close the browser window."))
         self.emit(("state", "setup"))
-        # Wait until the person closes the browser window.
-        while True:
-            try:
-                if not self._ctx or not self._ctx.pages:
-                    break
-                self._ctx.pages[0].wait_for_timeout(500)
-            except Exception:
-                break
-        self._close_browser()
-        self.emit(("status", "Login saved. Press START when ready."))
+        self.emit(("status", "Browser ist offen. Bei Loghon anmelden, dann das Browserfenster schließen."))
+        self._run_plain_browser()
+        self.emit(("status", "Anmeldung gespeichert. START drücken, wenn es losgeht."))
         self.emit(("state", "idle"))
+
+    def _run_plain_browser(self) -> None:
+        exe = self.s.chrome_path or self._playwright_chromium_path()
+        proc = subprocess.Popen([
+            exe,
+            f"--user-data-dir={self.s.profile_dir}",
+            "--no-first-run",
+            "--no-default-browser-check",
+            # Same cookie storage as Playwright uses, so START can read the
+            # login saved here (otherwise it is encrypted with the keyring).
+            "--password-store=basic",
+            "--use-mock-keychain",
+            self.s.start_url,
+        ])
+        proc.wait()  # until the person closes the window
 
     # ---- start --------------------------------------------------------
     def _start(self) -> None:
         if self._running:
-            self.emit(("status", "Translation is already running."))
+            self.emit(("status", "Die Übersetzung läuft bereits."))
             return
         self.emit(("state", "starting"))
-        self.emit(("status", "Opening Loghon…"))
+        self.emit(("status", "Loghon wird geöffnet…"))
         self._last_qr = None  # the window cleared it after the last stop
         page = self._open_browser(visible=self.s.show_browser)
         page.goto(self.s.start_url, wait_until="domcontentloaded")
         self._settle(page)
 
-        self.emit(("status", "Logging in…"))
-        self._login_if_needed(page)
+        self.emit(("status", "Anmeldung…"))
+        page = self._login_if_needed(page)
 
         if self.s.translation_url:
             page.goto(self.s.translation_url, wait_until="domcontentloaded")
@@ -192,14 +210,14 @@ class LoghonDriver:
                 loc.click()
                 self._settle(page)
 
-        self.emit(("status", "Switching on audio…"))
+        self.emit(("status", "Audio wird eingeschaltet…"))
         self._enable_audio(page)
 
-        self.emit(("status", "Starting translation…"))
+        self.emit(("status", "Übersetzung wird gestartet…"))
         btn = self._find_clickable(page, self.s.start_buttons, timeout=self.s.step_timeout_seconds)
         if not btn:
-            raise StepFailed("could not find the start button "
-                             f"(looked for: {', '.join(self.s.start_buttons)})")
+            raise StepFailed("Start-Knopf nicht gefunden "
+                             f"(gesucht: {', '.join(self.s.start_buttons)})")
         btn.click()
         self._settle(page)
 
@@ -210,46 +228,48 @@ class LoghonDriver:
                 loc.click()
                 self._settle(page)
 
-        self.emit(("status", "Waiting for the QR code…"))
+        self.emit(("status", "Warte auf den QR-Code…"))
         png = self._grab_qr(page, timeout=self.s.step_timeout_seconds)
         if png is None:
             self._dump_debug("no-qr")
-            self.emit(("status", "Translation started, but the QR code was not found on the page."))
+            self.emit(("status", "Übersetzung gestartet, aber der QR-Code wurde auf der Seite nicht gefunden."))
         else:
             self._publish_qr(png)
-            self.emit(("status", "Translation is running. Scan the QR code."))
+            self.emit(("status", "Die Übersetzung läuft. QR-Code scannen."))
         self._running = True
         self.emit(("state", "running"))
 
-    def _login_if_needed(self, page: Page) -> None:
+    def _login_if_needed(self, page: Page) -> Page:
         pw = page.locator("input[type=password]")
         if not self._visible(pw):
             # Maybe a "Log in" link must be clicked first; skip if we are
             # already logged in (persistent profile).
             if self._find_clickable(page, self.s.start_buttons, timeout=1):
-                return
+                return page
             link = self._find_clickable(page, self.s.login_buttons, timeout=3)
             if link:
                 link.click()
                 self._settle(page)
         if not self._visible(pw, wait=3):
-            return  # already logged in
+            return page  # already logged in
         if self.s.email and self.s.password:
             self._fill_login(page, pw)
             if self._gone(pw, timeout=10):
                 self._settle(page)
-                return
+                return page
         # Loghon's login has a Cloudflare "I'm human" check (Turnstile), which
-        # may refuse an automated login. Hand it to the person instead of
-        # failing: show the window and wait until they have logged in.
-        if self.s.browser_mode == "headless":
-            raise StepFailed("Loghon wants a login. Use 'Log in once…' to log in by hand.")
-        self._show_browser_window(page)
-        self.emit(("status", "Please log in in the Loghon window (tick the \"I'm human\" box). "
-                             "START continues by itself afterwards."))
-        if not self._gone(pw, timeout=self.s.login_wait_seconds):
-            raise StepFailed("nobody logged in to Loghon in time")
+        # always fails in a remote-controlled browser. Close it, let the
+        # person log in in a plain window, then carry on with the saved login.
+        self._close_browser()
+        self.emit(("status", "Loghon verlangt eine neue Anmeldung. Im Fenster, das sich öffnet, anmelden "
+                             "und es dann schließen. START macht danach von selbst weiter."))
+        self._run_plain_browser()
+        page = self._open_browser(visible=self.s.show_browser)
+        page.goto(self.s.start_url, wait_until="domcontentloaded")
         self._settle(page)
+        if self._visible(page.locator("input[type=password]"), wait=3):
+            raise StepFailed("immer noch nicht bei Loghon angemeldet")
+        return page
 
     def _fill_login(self, page: Page, pw: Locator) -> None:
         user = page.locator(
@@ -317,7 +337,7 @@ class LoghonDriver:
                 loc.click()
             return
         self._dump_debug("no-audio-toggle")
-        self.emit(("status", "Could not find the audio switch; continuing without it."))
+        self.emit(("status", "Audio-Schalter nicht gefunden; es geht ohne ihn weiter."))
 
     # ---- QR code --------------------------------------------------------
     def _grab_qr(self, page: Page, timeout: float) -> bytes | None:
@@ -380,7 +400,7 @@ class LoghonDriver:
         page = self._page
         if page is None or page.is_closed():
             self._running = False
-            self.emit(("error", "The Loghon browser window was closed."))
+            self.emit(("error", "Das Loghon-Browserfenster wurde geschlossen."))
             self.emit(("state", "idle"))
             return
         try:
@@ -399,10 +419,10 @@ class LoghonDriver:
         if page is None or page.is_closed():
             self._running = False
             self.emit(("state", "idle"))
-            self.emit(("status", "Nothing is running."))
+            self.emit(("status", "Es läuft nichts."))
             return True
         self.emit(("state", "stopping"))
-        self.emit(("status", "Stopping translation…"))
+        self.emit(("status", "Übersetzung wird gestoppt…"))
         btn = self._find_clickable(page, self.s.stop_buttons, timeout=self.s.step_timeout_seconds)
         if btn:
             btn.click()
@@ -417,13 +437,13 @@ class LoghonDriver:
             self._dump_debug("stop-not-confirmed")
             self._show_browser_window(page)
             self.emit(("state", "running"))
-            self.emit(("error", "Could not confirm the translation stopped. The Loghon window "
-                                "is now on screen: press its stop button, then press STOP here again."))
+            self.emit(("error", "Konnte nicht bestätigen, dass die Übersetzung gestoppt ist. Das Loghon-Fenster "
+                                "ist jetzt sichtbar: dort Stopp drücken, dann hier noch einmal STOPP."))
             return False
         self._close_browser()  # also releases the microphone
         self._running = False
         self.emit(("state", "idle"))
-        self.emit(("status", "Translation stopped. Press START for the next one."))
+        self.emit(("status", "Übersetzung gestoppt. START drücken für die nächste."))
         return True
 
     def _stop_button_gone(self, page: Page, timeout: float = 10) -> bool:
@@ -519,6 +539,6 @@ class LoghonDriver:
             base: Path = self.s.log_dir / f"{stamp}-{tag}"
             page.screenshot(path=str(base) + ".png", full_page=True)
             Path(str(base) + ".html").write_text(page.content(), encoding="utf-8")
-            self.emit(("status", f"Saved a screenshot for troubleshooting: {base}.png"))
+            self.emit(("status", f"Bildschirmfoto zur Fehlersuche gespeichert: {base}.png"))
         except Exception:
             pass

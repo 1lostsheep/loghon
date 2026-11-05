@@ -9,12 +9,12 @@ in church from a Linux Mint laptop.
   audio, starts the translation, allows the microphone and shows the
   translation's **QR code** full size. People in the room scan it with their
   phone camera to follow the translation.
-- **STOP** (red): presses Loghon's own stop button (and confirms if Loghon
+- **STOPP** (red): presses Loghon's own stop button (and confirms if Loghon
   asks), waits until Loghon shows it has stopped, and only then closes the
   hidden browser. The QR code disappears, since it only works while a
   translation is running. If the app can't confirm the stop, it does **not**
   close anything: it brings the Loghon window onto the screen so you can
-  press stop there, then press STOP in the app again.
+  press stop there, then press STOPP in the app again.
 
 The microphone is the laptop's default input. Choose it in Mint's
 *Sound* settings → *Input* (built-in mic or a plugged-in microphone/mixer feed).
@@ -30,25 +30,28 @@ cd ~/loghon-kiosk && ./install.sh
 ```
 
 This installs Python, Tk and a private copy of Chromium, and adds a
-**Loghon Translation** icon to the menu and the desktop.
+**Loghon Übersetzung** icon to the menu and the desktop.
 
 ## First run: log in once
 
-1. Open **Loghon Translation**.
-2. Click **Log in once…** (small button, bottom right). A normal browser
-   window opens on loghon.com.
-3. Log in with the church account (tick "remember me" if offered), then
-   close that browser window.
+1. Open **Loghon Übersetzung**.
+2. Click **Einmalig anmelden…** (small button, bottom right). A normal browser
+   window opens on app.loghon.com. It is not remote-controlled, so Loghon's
+   Cloudflare "I'm human" check works there.
+3. Log in with the church account, then close that browser window.
 
 The login is kept in the app's own browser profile
 (`~/.local/share/loghon-kiosk/browser-profile`), so you won't have to type it again.
-If you'd rather have the app type it, put `email` and `password` in
+If you'd rather have the app type it, put `username` and `password` in
 `~/.config/loghon-kiosk/config.ini` (that file is only readable by your user
 and is never part of this repository).
 
+All text on the kiosk screen is German; change the title and subtitle in
+`~/.config/loghon-kiosk/config.ini` under `[screen]`.
+
 ## Every Sunday
 
-Open the app → **START** → turn the screen to the audience → **STOP** after the talk.
+Open the app → **START** → turn the screen to the audience → **STOPP** after the talk.
 
 Keys: `F11` toggles full screen, `Esc` leaves full screen.
 
@@ -57,7 +60,7 @@ Keys: `F11` toggles full screen, `Esc` leaves full screen.
 The app was written without access to loghon.com, so the button names in it are
 guesses. To give it the real ones, record one walk-through on the laptop:
 
-1. In the app, do **Log in once…** (so the recording starts logged in), then quit the app.
+1. In the app, do **Einmalig anmelden…** (so the recording starts logged in), then quit the app.
 2. Run:
 
    ```bash
@@ -96,7 +99,7 @@ Or send the screenshot from the `logs` folder to whoever maintains this repo.
 
 | File | Purpose |
 |---|---|
-| `loghon_kiosk/app.py` | Full-screen Tk window (QR code, START, STOP, status line) |
+| `loghon_kiosk/app.py` | Full-screen Tk window (QR code, START, STOPP, status line) |
 | `loghon_kiosk/driver.py` | Drives loghon.com with Playwright/Chromium on a worker thread |
 | `loghon_kiosk/config.py` | Reads `~/.config/loghon-kiosk/config.ini` |
 | `config.example.ini` | All settings with explanations (copied on first run) |
