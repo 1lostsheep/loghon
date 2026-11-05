@@ -53,7 +53,9 @@ All text on the kiosk screen is German; change the title and subtitle in
 
 Open the app → **START** → turn the screen to the audience → **STOP** after the talk.
 
-Keys: `F11` toggles full screen, `Esc` leaves full screen.
+Keys: `F11` toggles full screen, `Esc` leaves full screen. After START and
+STOP the app comes back to the front by itself; `Alt+Tab` shows the hidden
+Loghon browser if you want to check it, and `Alt+Tab` again returns.
 
 ## Teaching the app the real Loghon steps (once)
 

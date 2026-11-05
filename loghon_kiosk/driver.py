@@ -32,6 +32,7 @@ from playwright.sync_api import (
 from .config import Settings
 
 Event = tuple  # ("status", text) | ("state", name) | ("qr", png_bytes) | ("error", text)
+#               | ("front", bool): whether the kiosk window may cover the browser
 
 
 CMD_DE = {"start": "Start", "stop": "Stopp", "setup": "Anmeldung", "quit": "Beenden"}
@@ -91,7 +92,7 @@ class LoghonDriver:
                     self._running = False
                     self.emit(("state", "idle"))
                 elif cmd == "stop" and self._running:
-                    self.emit(("state", "running"))  # STOPP can be pressed again
+                    self.emit(("state", "running"))  # STOP can be pressed again
 
     # ---- browser lifecycle -------------------------------------------
     def _open_browser(self, visible: bool) -> Page:
@@ -174,6 +175,13 @@ class LoghonDriver:
         self.emit(("state", "idle"))
 
     def _run_plain_browser(self) -> None:
+        self.emit(("front", False))  # let the login window be seen
+        try:
+            self._run_plain_browser_window()
+        finally:
+            self.emit(("front", True))
+
+    def _run_plain_browser_window(self) -> None:
         exe = self.s.chrome_path or self._playwright_chromium_path()
         proc = subprocess.Popen([
             exe,
@@ -477,6 +485,7 @@ class LoghonDriver:
                     break
         if not btn or not self._stop_button_gone(page):
             self._dump_debug("stop-not-confirmed")
+            self.emit(("front", False))  # the person has to see the Loghon window now
             self._show_browser_window(page)
             self.emit(("state", "running"))
             self.emit(("error", "Konnte nicht bestätigen, dass die Übersetzung gestoppt ist. Das Loghon-Fenster "

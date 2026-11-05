@@ -30,14 +30,15 @@ class KioskApp:
         self.events: queue.Queue = queue.Queue()
         self.qr_png: bytes | None = None
         self.state = "idle"
+        self.hold_back = False  # True while the person must see a browser window
 
         root.title("Loghon Übersetzung")
         root.configure(bg=BG)
         root.geometry("1280x800")
         if settings.fullscreen:
             root.attributes("-fullscreen", True)
-        root.bind("<F11>", lambda e: root.attributes("-fullscreen", not root.attributes("-fullscreen")))
-        root.bind("<Escape>", lambda e: root.attributes("-fullscreen", False))
+        root.bind("<F11>", lambda e: self._set_fullscreen(not root.attributes("-fullscreen")))
+        root.bind("<Escape>", lambda e: self._set_fullscreen(False))
         root.protocol("WM_DELETE_WINDOW", self.quit)
 
         # Left: the QR code, as tall as the window (people scan it from
@@ -108,12 +109,14 @@ class KioskApp:
     def on_start(self):
         if self.state != "idle":
             return
+        self.hold_back = False
         self._apply_state("starting")
         self.driver.submit("start")
 
     def on_stop(self):
         if self.state not in ("running", "starting"):
             return
+        self.hold_back = False
         self.driver.submit("stop")
 
     def on_setup(self):
@@ -123,7 +126,8 @@ class KioskApp:
 
     def quit(self):
         if self.state in ("running", "starting"):
-            if not messagebox.askyesno("Beenden", "Eine Übersetzung läuft. Stoppen und beenden?"):
+            if not messagebox.askyesno("Beenden", "Eine Übersetzung läuft. Stoppen und beenden?",
+                                       parent=self.root):
                 return
         self.status.config(text="Wird geschlossen…")
         self.driver.submit("quit")
@@ -141,14 +145,39 @@ class KioskApp:
                     self.qr_png = value
                     self.sub_lbl.config(text=self.s.subtitle)
                     self._render_qr()
+                elif kind == "front":
+                    self.hold_back = not value
+                    if value:
+                        self._to_front()
+                    else:
+                        self.root.lower()  # a login or Loghon window needs to be seen
                 elif kind == "state":
                     if value == "quit":
                         self.root.destroy()
                         return
                     self._apply_state(value)
+                    if value in ("running", "idle") and not self.hold_back:
+                        # The Loghon browser opened on top: take the screen back.
+                        self._to_front()
         except queue.Empty:
             pass
         self.root.after(150, self._poll)
+
+    def _set_fullscreen(self, on: bool):
+        self.s.fullscreen = on
+        self.root.attributes("-fullscreen", on)
+
+    def _to_front(self):
+        """Come back in front of the Loghon browser, without pinning the
+        window on top: Alt+Tab still shows the browser."""
+        self.root.deiconify()
+        if self.s.fullscreen:
+            self.root.attributes("-fullscreen", True)
+        self.root.lift()
+        # Window managers may refuse a plain lift; a brief "on top" does it.
+        self.root.attributes("-topmost", True)
+        self.root.after(800, lambda: self.root.attributes("-topmost", False))
+        self.root.focus_force()
 
     def _apply_state(self, state: str):
         self.state = state
