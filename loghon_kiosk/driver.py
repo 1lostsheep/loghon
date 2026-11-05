@@ -221,12 +221,17 @@ class LoghonDriver:
         btn.click()
         self._settle(page)
 
-        # A second confirm step is common ("Allow microphone", "Begin").
-        for text in self.s.after_start_buttons:
-            loc = self._find_clickable(page, [text], timeout=2)
+        # Loghon then shows "Session Setup" (microphone choice) with a
+        # "Start Recording" button; it can take a few seconds to appear.
+        if self.s.after_start_buttons:
+            self.emit(("status", "Aufnahme wird gestartet…"))
+            loc = self._find_clickable(page, self.s.after_start_buttons,
+                                       timeout=self.s.step_timeout_seconds)
             if loc:
                 loc.click()
                 self._settle(page)
+            else:
+                self._dump_debug("no-start-recording")
 
         self.emit(("status", "Warte auf den QR-Code…"))
         png = self._grab_qr(page, timeout=self.s.step_timeout_seconds)
@@ -349,6 +354,13 @@ class LoghonDriver:
                     loc.scroll_into_view_if_needed(timeout=2000)
                     page.wait_for_timeout(300)  # let the code finish drawing
                     return loc.screenshot()
+                except Exception:
+                    pass
+            # A late "Session Setup" box still needs its "Start Recording".
+            late = self._find_clickable(page, self.s.after_start_buttons, timeout=0)
+            if late:
+                try:
+                    late.click()
                 except Exception:
                     pass
             # Some sites hide the QR behind a "Share" / "Show QR" button.

@@ -12,6 +12,11 @@
   <label><input type="checkbox" id="audio"> Audio</label>
   <button id="start">Start translation</button>
 </section>
+<div id="setup" hidden>
+  <h3>Session Setup</h3>
+  <label>Select Microphone: <select><option>Default</option></select></label>
+  <button id="cancel">Cancel</button> <button id="rec">Start Recording</button>
+</div>
 <section id="live" hidden>
   <div class="qr-box"><canvas id="qr" width="200" height="200"></canvas></div>
   <button id="stop">Stop</button>
@@ -28,8 +33,14 @@ $('login').onsubmit = e => {
   if (e.target.password.value !== 'secret') return log('bad password');
   localStorage.loggedIn = '1'; $('login').hidden = true; $('app').hidden = false; log('logged in');
 };
-$('start').onclick = async () => {
+$('start').onclick = () => {
   log('audio=' + $('audio').checked);
+  // Like Loghon: a "Session Setup" box appears after a short delay.
+  setTimeout(() => { $('setup').hidden = false; }, 1500);
+};
+$('cancel').onclick = () => { $('setup').hidden = true; log('WRONG: cancel clicked'); };
+$('rec').onclick = async () => {
+  $('setup').hidden = true;
   await navigator.mediaDevices.getUserMedia({audio: true}).then(() => log('mic ok'), e => log('mic err ' + e.name));
   $('app').hidden = true; $('live').hidden = false;
   const c = $('qr').getContext('2d');

@@ -79,8 +79,18 @@ def load(path: Path | None = None) -> Settings:
     cp = configparser.ConfigParser(interpolation=None)
     cp.read(EXAMPLE_FILE, encoding="utf-8")  # defaults
     cp.read(path, encoding="utf-8")
+    defaults = configparser.ConfigParser(interpolation=None)
+    defaults.read(EXAMPLE_FILE, encoding="utf-8")
 
-    acc, scr, br, lab = cp["account"], cp["screen"], cp["browser"], cp["labels"]
+    acc, scr, br = cp["account"], cp["screen"], cp["browser"]
+
+    def labels(key: str) -> list[str]:
+        """The user's labels first, then the built-in ones, so labels added
+        in a newer version also work with an older config.ini."""
+        mine = _list(cp["labels"].get(key, ""))
+        built_in = _list(defaults["labels"].get(key, ""))
+        return mine + [t for t in built_in if t.lower() not in {m.lower() for m in mine}]
+
     s = Settings(
         start_url=acc.get("start_url", Settings.start_url).strip(),
         translation_url=acc.get("translation_url", "").strip(),
@@ -97,16 +107,16 @@ def load(path: Path | None = None) -> Settings:
         extra_args=br.get("extra_args", "").split(),
         step_timeout_seconds=br.getfloat("step_timeout_seconds", 30),
         qr_refresh_seconds=br.getfloat("qr_refresh_seconds", 10),
-        login_buttons=_list(lab.get("login_buttons", "")),
-        login_submit_buttons=_list(lab.get("login_submit_buttons", "")),
-        pre_start_buttons=_list(lab.get("pre_start_buttons", "")),
-        audio_labels=_list(lab.get("audio_labels", "")),
-        start_buttons=_list(lab.get("start_buttons", "")),
-        after_start_buttons=_list(lab.get("after_start_buttons", "")),
-        show_qr_buttons=_list(lab.get("show_qr_buttons", "")),
-        qr_selectors=_list(lab.get("qr_selectors", "")),
-        stop_buttons=_list(lab.get("stop_buttons", "")),
-        confirm_stop_buttons=_list(lab.get("confirm_stop_buttons", "")),
+        login_buttons=labels("login_buttons"),
+        login_submit_buttons=labels("login_submit_buttons"),
+        pre_start_buttons=labels("pre_start_buttons"),
+        audio_labels=labels("audio_labels"),
+        start_buttons=labels("start_buttons"),
+        after_start_buttons=labels("after_start_buttons"),
+        show_qr_buttons=labels("show_qr_buttons"),
+        qr_selectors=labels("qr_selectors"),
+        stop_buttons=labels("stop_buttons"),
+        confirm_stop_buttons=labels("confirm_stop_buttons"),
     )
     for d in (s.profile_dir, s.log_dir):
         d.mkdir(parents=True, exist_ok=True)
