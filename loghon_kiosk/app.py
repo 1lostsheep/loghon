@@ -20,6 +20,7 @@ GREEN = "#1e9e46"
 GREEN_DIM = "#9ccfac"
 RED = "#d62828"
 RED_DIM = "#e8a3a3"
+QR_PAD = 16  # white space around the QR code, in pixels
 
 
 class KioskApp:
@@ -39,56 +40,59 @@ class KioskApp:
         root.bind("<Escape>", lambda e: root.attributes("-fullscreen", False))
         root.protocol("WM_DELETE_WINDOW", self.quit)
 
-        # Left: QR code area. Right: buttons.
-        root.columnconfigure(0, weight=3)
-        root.columnconfigure(1, weight=1, minsize=320)
+        # Left: the QR code, as tall as the window (people scan it from
+        # several metres away). Right: texts for the audience and the buttons.
+        root.columnconfigure(0, weight=0)
+        root.columnconfigure(1, weight=1)
         root.rowconfigure(0, weight=1)
 
-        left = tk.Frame(root, bg=BG)
-        left.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
-        self.title_lbl = tk.Label(left, text=settings.title, bg=BG, fg=FG,
-                                  font=("DejaVu Sans", 40, "bold"))
-        self.title_lbl.pack(side="top", pady=(10, 0))
-        self.sub_lbl = tk.Label(left, text=settings.subtitle, bg=BG, fg="#555",
-                                font=("DejaVu Sans", 22))
-        self.sub_lbl.pack(side="top", pady=(0, 10))
-        self.qr_lbl = tk.Label(left, bg=BG, fg="#888", font=("DejaVu Sans", 30),
+        self.qr_lbl = tk.Label(root, bg=BG, fg="#888", font=("DejaVu Sans", 30),
                                text="START drücken, um die\nÜbersetzung zu beginnen")
-        if settings.viewer_url:
-            # The link in plain text, for phones that cannot scan.
-            self.url_lbl = tk.Label(left, text=settings.viewer_url.split("://", 1)[-1],
-                                    bg=BG, fg=FG, font=("DejaVu Sans", 24))
-            self.url_lbl.pack(side="bottom", pady=(5, 0))
-        self.qr_lbl.pack(side="top", fill="both", expand=True)
-        self.qr_lbl.bind("<Configure>", lambda e: self._render_qr())
+        self.qr_lbl.grid(row=0, column=0, sticky="nsew", padx=(QR_PAD, 10), pady=QR_PAD)
+        root.bind("<Configure>", self._on_resize)
+        self._qr_side = 0
 
         right = tk.Frame(root, bg=BG)
-        right.grid(row=0, column=1, sticky="nsew", padx=(0, 30), pady=40)
-        right.rowconfigure(0, weight=1)
-        right.rowconfigure(1, weight=1)
+        right.grid(row=0, column=1, sticky="nsew", padx=(10, 30), pady=30)
         right.columnconfigure(0, weight=1)
+        right.rowconfigure(3, weight=1)
+        right.rowconfigure(4, weight=1)
 
-        btn_font = ("DejaVu Sans", 36, "bold")
+        self.title_lbl = tk.Label(right, text=settings.title, bg=BG, fg=FG, justify="center",
+                                  font=("DejaVu Sans", 34, "bold"))
+        self.title_lbl.grid(row=0, column=0, sticky="ew")
+        self.sub_lbl = tk.Label(right, text=settings.subtitle, bg=BG, fg="#555", justify="center",
+                                font=("DejaVu Sans", 20))
+        self.sub_lbl.grid(row=1, column=0, sticky="ew", pady=(4, 0))
+        # The link in plain text, for phones that cannot scan.
+        self.url_lbl = tk.Label(right, text=settings.viewer_url.split("://", 1)[-1],
+                                bg=BG, fg=FG, font=("DejaVu Sans", 20, "bold"))
+        self.url_lbl.grid(row=2, column=0, sticky="ew", pady=(14, 20))
+        for lbl in (self.title_lbl, self.sub_lbl, self.url_lbl):
+            lbl.bind("<Configure>", lambda e, l=lbl: l.config(wraplength=max(200, e.width - 10)))
+
+        btn_font = ("DejaVu Sans", 34, "bold")
         self.start_btn = tk.Button(right, text="START", font=btn_font, bg=GREEN, fg="white",
                                    activebackground="#178a3b", activeforeground="white",
                                    disabledforeground="white", relief="flat", bd=0,
                                    command=self.on_start, cursor="hand2")
-        self.start_btn.grid(row=0, column=0, sticky="nsew", pady=(0, 15))
+        self.start_btn.grid(row=3, column=0, sticky="nsew", pady=(0, 10))
         self.stop_btn = tk.Button(right, text="STOPP", font=btn_font, bg=RED, fg="white",
                                   activebackground="#b51f1f", activeforeground="white",
                                   disabledforeground="white", relief="flat", bd=0,
                                   command=self.on_stop, cursor="hand2")
-        self.stop_btn.grid(row=1, column=0, sticky="nsew", pady=(15, 0))
+        self.stop_btn.grid(row=4, column=0, sticky="nsew", pady=(10, 0))
 
-        bottom = tk.Frame(root, bg=BG)
-        bottom.grid(row=1, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 10))
-        self.status = tk.Label(bottom, text="Bereit.", bg=BG, fg="#444", anchor="w",
-                               justify="left", wraplength=900, font=("DejaVu Sans", 14))
-        self.status.pack(side="left", fill="x", expand=True)
+        self.status = tk.Label(right, text="Bereit.", bg=BG, fg="#444", anchor="w",
+                               justify="left", font=("DejaVu Sans", 13))
+        self.status.grid(row=5, column=0, sticky="ew", pady=(12, 0))
+        self.status.bind("<Configure>", lambda e: self.status.config(wraplength=max(200, e.width - 10)))
+        bottom = tk.Frame(right, bg=BG)
+        bottom.grid(row=6, column=0, sticky="e", pady=(6, 0))
         small = dict(font=("DejaVu Sans", 11), relief="flat", bg="#eee", fg="#333", bd=0, padx=10, pady=4)
-        tk.Button(bottom, text="Beenden", command=self.quit, **small).pack(side="right", padx=4)
         self.setup_btn = tk.Button(bottom, text="Einmalig anmelden…", command=self.on_setup, **small)
-        self.setup_btn.pack(side="right", padx=4)
+        self.setup_btn.pack(side="left", padx=4)
+        tk.Button(bottom, text="Beenden", command=self.quit, **small).pack(side="left", padx=4)
 
         if settings.viewer_url:
             self.qr_png = make_qr(settings.viewer_url)  # fixed: shown all the time
@@ -161,13 +165,23 @@ class KioskApp:
             self.qr_png = None
             self._render_qr()
 
+    def _on_resize(self, event):
+        if event.widget is not self.root:
+            return
+        # A square as tall as the window, but leave the right column at least
+        # a third of the width for the texts and buttons.
+        side = min(event.height - 2 * QR_PAD, int(event.width * 0.64) - QR_PAD - 10)
+        if side != self._qr_side and side > 100:
+            self._qr_side = side
+            self.root.columnconfigure(0, minsize=side + QR_PAD + 10)
+            self._render_qr()
+
     def _render_qr(self):
         if not self.qr_png:
             self.qr_lbl.config(image="", text="START drücken, um die\nÜbersetzung zu beginnen")
             self.qr_lbl.image = None
             return
-        w, h = self.qr_lbl.winfo_width(), self.qr_lbl.winfo_height()
-        side = max(100, min(w, h) - 10)
+        side = self._qr_side or 400
         img = Image.open(io.BytesIO(self.qr_png)).convert("RGB")
         # Scale to fit, keeping the squares sharp so phones can read it.
         scale = side / max(img.size)
@@ -178,7 +192,7 @@ class KioskApp:
 
 
 def make_qr(url: str) -> bytes:
-    q = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=4)
+    q = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=2)
     q.add_data(url)
     q.make(fit=True)
     buf = io.BytesIO()
